@@ -1,0 +1,378 @@
+---
+title: "homework1"
+output:
+  pdf_document: default
+  html_document:
+    keep_md: yes
+---
+Winter Olympics Medals over Time
+================================
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Medal Counts over Time
+
+### a)
+
+I have decided to merge all the designations for the same country to match the gdp_pop table. I have done this by recoding NOC to match the designation's origin country NOC code.This was only done for Russia and Germany since only top 10 countries are being used in the visualizations.
+
+To prevent the issue of counting multiple medals for team events, I have kept distinct values in terms of Sex, Team, Game, and Event (everything else included in distinct() function was to maintain variables from athletes_events)
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+
+athletes_events <- read.csv("C:/1columbia/dv/assignment-1---winter-olympics-dustintdn/data/athletes_and_events.csv")
+gdp_pop <- read.csv("C:/1columbia/dv/assignment-1---winter-olympics-dustintdn/data/gdp_pop.csv")
+noc_regions <- read.csv("C:/1columbia/dv/assignment-1---winter-olympics-dustintdn/data/noc_regions.csv")
+
+#recoding: all russian teams = Russia, all german teams = Germany
+
+athletes_events$NOC[athletes_events$NOC == "URS"] <- "RUS"
+athletes_events$NOC[athletes_events$NOC == "FRG"] <- "GER"
+athletes_events$NOC[athletes_events$NOC == "GDR"] <- "GER"
+athletes_events$NOC[athletes_events$NOC == "EUA"] <- "GER"
+
+#removing duplicate medals for team-events
+
+athletes <- distinct(athletes_events, Sex, Team, NOC, Games, Year, Season, City, Sport, Event, Medal)
+merge1 <- left_join(athletes, noc_regions)
+dataset <- left_join(merge1, gdp_pop, by=c("NOC" = "Code"))
+
+```
+
+### b)
+
+
+```{r}
+
+top10winter <- dataset %>%
+  drop_na(Medal) %>%
+  filter(Season == 'Winter') %>%
+  group_by(Country) %>%
+  summarize(total = sum(Medal=='Gold')) %>%
+  arrange(desc(total)) %>%
+  mutate(rank = row_number()) %>%
+  filter(rank <= 10) %>%
+  ungroup() %>%
+  select(Country) %>%
+  unlist() %>%
+  c()
+
+#total nmber of winter olympics
+dataset %>%
+  filter(Season== 'Winter',Country %in% top10winter) %>%
+  group_by(Country, Year) %>%
+  summarize(total = length(unique(Year))) %>%
+  ggplot(., aes(x=Country, y=total)) +
+  geom_col(fill = 'lightblue') +
+  coord_flip() +
+  labs(x = "Country",
+       y = "# of Winter Olympics",
+       title = "Winter Olympics Participation by Country", caption="Source: International Olympic Committee") +
+  theme_classic()
+
+```
+
+This table displays the number of times the top 10 gold-medal-earning countries had participated in the Winter Olympics.
+
+
+
+
+```{r}
+dataset %>%
+  drop_na(Medal) %>%
+  filter(Season=="Winter",Country %in% top10winter) %>%
+  filter(Medal =='Gold') %>%
+  group_by(Country, Medal, Year) %>%
+  tally() %>%
+  ggplot(., aes(x=Year, y=n, group=Country, color = Country)) +
+  geom_line() +
+  labs(x = "Year",
+       y = "# of Gold Medals",
+       title = "Gold Medals Earned Over Time", caption="Source: International Olympic Committee") +
+  theme_classic()
+```
+
+Line graph displays the gold medals each country has earned every Winter Olympics
+
+
+```{r}
+dataset %>%
+  drop_na(Medal) %>%
+  filter(Season== "Winter",Country %in% top10winter) %>%
+  group_by(Country, Medal) %>%
+  tally() %>%
+  ggplot(., aes(x=Country, y=n, fill=Medal )) +
+  coord_flip() +
+  geom_bar(position="dodge", stat="identity") +
+  labs(x = "Team",
+       y = "# of Medals Earned",
+       title = "Olympic Medals Earned by Country and Medal Type", caption="Source: International Olympic Committee") +
+  scale_fill_manual('Medal Type', values=c('tan4', 'gold2', 'snow3')) +
+  theme_classic()
+```
+
+This table shows the medal counts by medal type that each team has earned all-time.
+
+## 2. Medal Counts adjusted by Population, GDP
+
+### a) Unadjusted ranking (top 10 in gold medals)
+
+
+```{r}
+dataset %>%
+  filter(Season== 'Winter', Medal== 'Gold', Country %in% top10winter) %>%
+  group_by(Country) %>%
+  summarize(total = sum(Medal=='Gold')) %>%
+  ggplot(., aes(x=Country, y=total)) +
+  geom_col(fill = 'gold2') +
+  coord_flip() +
+  labs(x = "Country",
+       y = "# of Gold Medals Earned",
+       title = "Winter Olympics Top 10 Gold Medals by Country (Unadjusted Ranking)", caption="Source: International Olympic Committee") +
+  theme_classic()
+```
+
+Since we are going by gold medal ranking, this bar chat is essentially the same as the previous visual (grouped bar chart) but with gold medals only. 
+
+### b) Ranking by GDP per capita
+
+
+
+```{r}
+top10winter_gdp_capita <- dataset %>%
+  drop_na(GDP.per.Capita, Medal) %>%
+  filter(Season == "Winter", Medal=="Gold") %>%
+  group_by(Country) %>%
+  summarise(medalbygdp = (GDP.per.Capita)/(sum(Medal=='Gold')), .groups='drop') %>%
+  distinct(Country, medalbygdp) %>%
+  arrange(medalbygdp) %>%
+  mutate(rank = row_number()) %>%
+  filter(rank<= 10) %>%
+  ungroup() %>%
+  select(Country) %>%
+  unlist() %>%
+  c()
+
+dataset %>%
+  filter(Season== 'Winter', Medal== 'Gold', Country %in% top10winter_gdp_capita) %>%
+  group_by(Country) %>%
+  summarize(total = (GDP.per.Capita)/(sum(Medal=='Gold'))) %>%
+  ggplot(., aes(x=Country, y=total)) +
+  geom_col(fill = 'gold2') +
+  coord_flip() +
+  labs(x = "Country",
+       y = "GDP per Medal",
+       title = "Winter Olympics GDP per capita per Gold Medal", caption="Source: International Olympic Committee") +
+  theme_classic()
+
+```
+
+This ranking is done so that highest ranking country is the one with the lowest ratio of Gold Medals per GDP per capita. This is because a ratio approaching 0 means a country has a high medal count with a low GDP per capita. This is under the assumption that greater GDP = greater # of medals. 
+
+### c) Ranking by Population
+
+
+```{r}
+top10winter_pop <- dataset %>%
+  drop_na(Population, Medal) %>%
+  filter(Season == "Winter", Medal=="Gold") %>%
+  group_by(Country) %>%
+  summarise(medalbypop = (Population)/(sum(Medal=='Gold')), .groups='drop') %>%
+  distinct(Country, medalbypop) %>%
+  arrange(medalbypop) %>%
+  mutate(rank = row_number()) %>%
+  filter(rank<= 10) %>%
+  ungroup() %>%
+  select(Country) %>%
+  unlist() %>%
+  c()
+
+dataset %>%
+  filter(Season== 'Winter', Medal== 'Gold', Country %in% top10winter_pop) %>%
+  group_by(Country) %>%
+  summarize(total = (Population)/(sum(Medal=='Gold'))) %>%
+  ggplot(., aes(x=Country, y=total)) +
+  geom_col(fill = 'gold2') +
+  coord_flip() +
+  labs(x = "Country",
+       y = "Population per Medal",
+       title = "Winter Olympics Population per Gold Medal", caption="Source: International Olympic Committee") +
+  theme_classic()
+
+
+```
+
+Liechtenstein only has two golden medals with a population of 37,531.
+
+## 3. Host Country Advantage
+
+Data preparation for host country advantage visualizations
+
+```{r}
+library(rvest)
+library(stringr)
+library(tidyverse)
+wiki_hosts <- read_html("https://en.wikipedia.org/wiki/List_of_Olympic_Games_host_cities")
+hosts <- html_table(html_nodes(wiki_hosts, "table")[[2]], fill=TRUE)[-1]
+hosts <- hosts %>% filter(Winter != "") %>%
+  select(City, Country, Year)
+
+hosts <- select(hosts, Year, Country, City)
+hosts <- rename(hosts, HostCountry = Country)
+hosts <- rename(hosts, HostCity = City)
+hosts$HostCountry[hosts$HostCountry == "Russia[h]"] <- "Russia"
+hosts$HostCity[hosts$HostCity == "Innsbruck[g]"] <- "Innsbruck"
+data_prep <- filter(dataset, Season == "Winter")
+host_dataset <- left_join(data_prep, hosts, by=c("Year" = "Year"))
+```
+
+```{r}
+avg_medals <- host_dataset %>%
+  filter(Country %in% hosts$HostCountry, Medal =="Gold", Country != "China") %>%
+  group_by(Country) %>%
+  summarise(avgtotal = sum(Medal=="Gold")/length(unique(Year)))
+
+
+avg_medals_hosting <- host_dataset %>%
+  filter(Country == HostCountry, Medal=="Gold") %>%
+  group_by(Country) %>%
+  summarise(avgtotal = sum(Medal=="Gold")/length(unique(Year)))
+  
+ggplot(avg_medals_hosting, aes(x=Country, y=avgtotal)) + 
+  geom_point(data=avg_medals_hosting, size=3, color="blue") + 
+  geom_point(data=avg_medals, aes(x=Country, y=avgtotal), size=3, color="red" ) +
+  scale_colour_manual(values=c('Average Gold Medals Earned (Total)'='blue', 'Average Gold Medals Earned (Hosting)'='red')) +
+  labs(x = "Country",
+       y = "Average Gold Medals",
+       title = "Winter Olympics Host Country Advantage (Gold Medals)",caption="Sources: International Olympic Committee, Wikipedia") +
+  theme_classic()
+  
+
+```
+
+You can see that for a majority of hosting countries (7/10), there was a higher average gold medals earned when they had hosted the Olympics compared to their all-time average. The only case in which hosting led to a lower average gold medal attainment was for Germany, but this could partially be due to the fact that Germany's figure is a combination of five designations over time. 
+
+## 4. Most Successful Athletes
+
+```{r}
+top_medalists <- athletes_events %>%
+  drop_na(Medal) %>%
+  filter(Season =="Winter") %>%
+  group_by(Name) %>%
+  summarise(total = sum(Medal!="")) %>%
+  arrange(desc(total)) %>%
+  mutate(rank = row_number()) %>%
+  filter(rank<= 10) %>%
+  ungroup() %>%
+  select(Name) %>%
+  unlist() %>%
+  c()
+
+athletes_events %>%
+  drop_na(Medal) %>%
+  filter(Name %in% top_medalists) %>%
+  group_by(Name, Team) %>%
+  summarise(total = sum(Medal!="")) %>%
+  ggplot(., aes(x=Name, y=total, color=Team, fill=Team)) +
+  geom_col() +
+  coord_flip() +
+  labs(x = "Athlete",
+       y = "Total Medals Earned",
+       title = "Winter Olympics Top 10 Athletes (Total Medals)", caption="Source: International Olympic Committee") +
+  theme_classic()
+  
+```
+
+This barplot highlights athletes with the greatest total medals earned (bronze, silver, gold = 1). The color represents there team designation for the number of medals they had earned.
+
+```{r}
+athletes_events %>%
+  drop_na(Medal) %>%
+  drop_na(Height) %>%
+  drop_na(Weight) %>%
+  filter(Season=="Winter") %>%
+  group_by(Medal) %>%
+  summarise(avgheight= mean(Height), avgweight = mean(Weight)) %>%
+  ggplot(., aes(x=reorder(Medal, -avgheight), y=avgheight, fill=Medal)) +
+  geom_col() + coord_cartesian(ylim = c(172, 178))+
+  scale_y_continuous(breaks = seq(172, 178, by = 2)) +
+  labs(x = "Medal Type",
+       y = "Average Height (CM)",
+       title = "Winter Olympics Average Athlete Height by Medal Type", caption="Source: International Olympic Committee") +
+  theme_classic()
+  
+```
+
+There is a thin correlation between earning a higher level medal and athlete height. Keep in mind the y-axis scale of the graph is very small to show the differences in the average heights of each medalist category. There is only about a one centimeter range in average heights! So it could also be said that 175CM is the ideal medalist height(?)
+
+## 5. Make two plots interactive
+
+#Line Graph with Plotly
+
+```{r}
+library(plotly)
+
+int_line <- dataset %>%
+  drop_na(Medal) %>%
+  filter(Season=="Winter",Country %in% top10winter) %>%
+  filter(Medal =='Gold') %>%
+  group_by(Country, Medal, Year) %>%
+  tally() %>%
+  plot_ly(x = ~Year, y= ~n) %>%
+  add_lines(alpha = .9, name = ~Country, color = ~Country, hoverinfo = "yes") %>%
+  layout(title = "Gold Medals Earned Over Time", 
+         xaxis = list(title = "Year", zeroline = FALSE),
+         yaxis = list(title = "# of Gold Medals Earned",zeroline = FALSE))
+
+int_line
+
+```
+
+The interactive line graph from question #2. This interactive graph is more insightful because hovering shows the number of gold medals earned by country for each year. This may have otherwise been difficult to discern from the static graphic. 
+
+#Bar Graph  with ggplotly
+
+```{r}
+int_bar <- dataset %>%
+  drop_na(Medal) %>%
+  filter(Season== "Winter",Country %in% top10winter) %>%
+  group_by(Country, Medal) %>%
+  tally() %>%
+  ggplot(., aes(x=Country, y=n, fill=Medal )) +
+  coord_flip() +
+  geom_bar(position="dodge", stat="identity") +
+  labs(x = "Team",
+       y = "# of Medals Earned",
+       title = "Olympic Medals Earned by Country and Medal Type", caption="Source: International Olympic Committee") +
+  scale_fill_manual('Medal Type', values=c('tan4', 'gold2', 'snow3')) +
+  theme_classic()
+
+ggplotly(int_bar)
+```
+
+Interactive stacked bar graph.
+
+##6. Data Table
+
+The data table below shows the total number of each medal type that every Winter Olympic athlete has earned up to 2014.
+
+```{r}
+library(DT)
+
+table_data <- athletes_events %>%
+  drop_na(Medal) %>%
+  filter(Season =="Winter") %>%
+  group_by(Name, Medal) %>%
+  tally() %>%
+  spread(Medal, n)
+
+datatable(table_data) %>%
+  formatStyle('Bronze', color = "white", backgroundColor = '#8f7143', fontWeight='bold') %>%
+  formatStyle('Silver', color = "white", backgroundColor = 'grey', fontWeight='bold') %>%
+  formatStyle('Gold', color = "white", backgroundColor = 'goldenrod', fontWeight='bold')
+
+```
