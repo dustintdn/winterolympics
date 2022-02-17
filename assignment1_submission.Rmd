@@ -1,9 +1,9 @@
 ---
 title: "homework1"
 output:
-  pdf_document: default
   html_document:
     keep_md: yes
+  pdf_document: default
 ---
 Winter Olympics Medals over Time
 ================================
@@ -24,9 +24,10 @@ To prevent the issue of counting multiple medals for team events, I have kept di
 library(ggplot2)
 library(tidyverse)
 
-athletes_events <- read.csv("C:/1columbia/dv/assignment-1---winter-olympics-dustintdn/data/athletes_and_events.csv")
-gdp_pop <- read.csv("C:/1columbia/dv/assignment-1---winter-olympics-dustintdn/data/gdp_pop.csv")
-noc_regions <- read.csv("C:/1columbia/dv/assignment-1---winter-olympics-dustintdn/data/noc_regions.csv")
+setwd('C:/1columbia/dv/winterolympics')
+athletes_events <- read.csv("./data/athletes_and_events.csv")
+gdp_pop <- read.csv("./data/gdp_pop.csv")
+noc_regions <- read.csv("./data/noc_regions.csv")
 
 #recoding: all russian teams = Russia, all german teams = Germany
 
@@ -332,7 +333,7 @@ int_line
 
 ```
 
-The interactive line graph from question #2. This interactive graph is more insightful because hovering shows the number of gold medals earned by country for each year. This may have otherwise been difficult to discern from the static graphic. 
+The line graph from question #2 made interactive using plotly. This interactive graph is more insightful because hovering shows the number of gold medals earned by country for each year. This may have otherwise been difficult to discern from the static graphic. 
 
 #Bar Graph  with ggplotly
 
@@ -354,7 +355,7 @@ int_bar <- dataset %>%
 ggplotly(int_bar)
 ```
 
-Interactive stacked bar graph.
+Interactive stacked bar graph using the ggplotly wrapper.
 
 ##6. Data Table
 
